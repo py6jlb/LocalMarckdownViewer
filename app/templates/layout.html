@@ -1,0 +1,26 @@
+{{define "layout"}}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/bulma/bulma.css">
+  {{template "head"}}
+  {{template "title" .}}
+  <title>заглушка для тайтла</title>
+</head>
+<body>
+    <nav class="navbar is-fixed-top is-primary" role="navigation" style="transform: translateY(0px);">
+        <div class="container">
+            <div class="navbar-menu">
+                <div class="navbar-start">
+                    <a href="/" class="navbar-item is-hoverable">В самое начало</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+{{template "body" .}}
+{{template "scripts"}}
+</body>
+</html>
+{{end}}
