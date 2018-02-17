@@ -2,11 +2,15 @@
 {{end}}
 {{define "title"}}Ошибка{{end}}
 {{define "body"}}
-<div class="container">
-    <section class="section" style="text-align:left;">
-        {{.Status}} {{.Error}}
-    </section>
-</div>
+<section class="section">
+    <div class="container">
+        <hr>
+        <div class="content">
+            {{.Status}} {{.Error}}
+        </div>
+        <hr>
+    </div>
+</section>
 {{end}}
 {{define "scripts"}}
 {{end}}

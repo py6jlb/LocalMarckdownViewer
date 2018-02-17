@@ -1,55 +1,49 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"path"
+	"strconv"
 	"strings"
 
-	"github.com/bmizerany/pat"
-	"gopkg.in/russross/blackfriday.v2"
+	"github.com/gorilla/mux"
 )
 
 var (
 	post_template  = template.Must(template.ParseFiles(path.Join("app", "templates", "layout.html"), path.Join("app", "templates", "post.html")))
 	error_template = template.Must(template.ParseFiles(path.Join("app", "templates", "layout.html"), path.Join("app", "templates", "error.html")))
+	notes          = newNotesCollection()
 )
 
-type Post struct {
-	Title string
-	Body  template.HTML
-}
-
 func main() {
-	fs := http.FileServer(http.Dir("app/assets"))
+	cfg, err := initConfig()
+	if err != nil {
+		log.Fatalln(err)
+	}
 
-	mux := pat.New()
-	mux.Get("/:page", http.HandlerFunc(dataHandler))
-	mux.Get("/:page/", http.HandlerFunc(dataHandler))
-	mux.Get("/", http.HandlerFunc(dataHandler))
+	mux := mux.NewRouter()
+	s := http.StripPrefix("/static/", noDirListing(http.FileServer(http.Dir("app/assets"))))
+	mux.PathPrefix("/static/").Handler(s)
+	mux.PathPrefix("/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { noteHandler(w, r, cfg) }))
 
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
 	http.Handle("/", mux)
-	log.Println("Open in browser: http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	listen := cfg.ListenAddress + ":" + strconv.Itoa(cfg.ListenPort)
+	log.Println("Open in browser: http://" + listen)
+	http.ListenAndServe(listen, nil)
 }
 
-func dataHandler(w http.ResponseWriter, r *http.Request) {
-
-	params := r.URL.Query()
-	page := params.Get(":page")
-	p := path.Join("data", page)
+func noteHandler(w http.ResponseWriter, r *http.Request, cfg *config) {
+	page := r.URL.Path
+	p := path.Join(cfg.DataPath, page)
 	var post_md string
-	if page != "" {
+	if page != "/" {
 		post_md = p + ".md"
 	} else {
-		post_md = p + "/index.md"
+		post_md = p + "/" + cfg.IndexFileName
 	}
-	post, status, err := load_post(post_md)
+	post, status, err := notes.getNote(post_md)
 	if err != nil {
 		errorHandler(w, r, status)
 		return
@@ -60,25 +54,6 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func load_post(md string) (Post, int, error) {
-	info, err := os.Stat(md)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return Post{}, http.StatusNotFound, err
-		}
-	}
-	if info.IsDir() {
-		return Post{}, http.StatusNotFound, fmt.Errorf("dir")
-	}
-	fileread, _ := ioutil.ReadFile(md)
-	lines := strings.Split(string(fileread), "\n")
-	title := string(lines[0])
-	body := strings.Join(lines[1:len(lines)], "\n")
-	body = string(blackfriday.Run([]byte(body)))
-	post := Post{title, template.HTML(body)}
-	return post, 200, nil
-}
-
 func errorHandler(w http.ResponseWriter, r *http.Request, status int) {
 	w.WriteHeader(status)
 	if err := error_template.ExecuteTemplate(w, "layout", map[string]interface{}{"Error": http.StatusText(status), "Status": status}); err != nil {
@@ -86,4 +61,14 @@ func errorHandler(w http.ResponseWriter, r *http.Request, status int) {
 		http.Error(w, http.StatusText(500), 500)
 		return
 	}
+}
+
+func noDirListing(h http.Handler) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/") || r.URL.Path == "" {
+			http.NotFound(w, r)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }

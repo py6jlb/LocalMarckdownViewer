@@ -1,0 +1,6 @@
+{
+    "listen_address": "localhost",
+    "listen_port": 8080,
+    "data_path" : "data",
+    "index_file_name": "index.md"
+}
