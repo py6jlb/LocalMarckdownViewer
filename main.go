@@ -1,3 +1,4 @@
+//go:generate goversioninfo -icon=assets/icons/icon.ico
 package main
 
 import (
@@ -8,23 +9,41 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/GeertJohan/go.rice"
 	"github.com/gorilla/mux"
 )
 
 var (
-	postTemplate  = template.Must(template.ParseFiles(path.Join("assets", "templates", "layout.html"), path.Join("assets", "templates", "post.html")))
-	errorTemplate = template.Must(template.ParseFiles(path.Join("assets", "templates", "layout.html"), path.Join("assets", "templates", "error.html")))
+	postTemplate  = getTemplate("post.html")
+	errorTemplate = getTemplate("error.html")
 	notes         = newNotesCollection()
 )
+
+func getTemplate(templateName string) *template.Template {
+	templateBox := rice.MustFindBox("assets")
+	layoutTemplateString, err := templateBox.String("templates/layout.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	templateString, err := templateBox.String("templates/" + templateName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	template, err := template.New(templateName).Parse(layoutTemplateString + templateString)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return template
+}
 
 func main() {
 	cfg, err := initConfig()
 	if err != nil {
 		log.Fatalln(err)
 	}
-
+	assetsBox := rice.MustFindBox("assets").HTTPBox()
 	mux := mux.NewRouter()
-	staticHandler := http.StripPrefix("/static", noDirListing(http.FileServer(http.Dir("assets"))))
+	staticHandler := http.StripPrefix("/static", noDirListing(http.FileServer(assetsBox)))
 	mux.PathPrefix("/static/").Handler(staticHandler)
 
 	mux.PathPrefix("/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { noteHandler(w, r, cfg) }))
@@ -67,7 +86,7 @@ func errorHandler(w http.ResponseWriter, r *http.Request, status int) {
 func noDirListing(h http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/") || r.URL.Path == "" {
-			http.NotFound(w, r)
+			errorHandler(w, r, 404)
 			return
 		}
 		h.ServeHTTP(w, r)
