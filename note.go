@@ -13,8 +13,7 @@ import (
 )
 
 type note struct {
-	Title   string
-	Body    template.HTML
+	Content template.HTML
 	ModTime int64
 }
 
@@ -44,11 +43,9 @@ func (n *notesCollection) getNote(md string) (note, int, error) {
 		n.RLock()
 		defer n.RUnlock()
 		fileread, _ := ioutil.ReadFile(md)
-		lines := strings.Split(string(fileread), "\n")
-		title := string(lines[0])
-		body := strings.Join(lines[1:len(lines)], "\n")
-		body = string(blackfriday.Run([]byte(body)))
-		post := note{title, template.HTML(body), info.ModTime().UnixNano()}
+		markdown := strings.Replace(string(fileread), "\r\n", "\n", -1)
+		body := string(blackfriday.Run([]byte(markdown)))
+		post := note{template.HTML(body), info.ModTime().UnixNano()}
 		n.Notes[md] = post
 	}
 	result := n.Notes[md]
