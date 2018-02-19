@@ -20,7 +20,10 @@ var (
 )
 
 func getTemplate(templateName string) *template.Template {
-	templateBox := rice.MustFindBox("assets")
+	templateBox, err := rice.FindBox("assets")
+	if err != nil {
+		log.Fatal(err)
+	}
 	layoutTemplateString, err := templateBox.String("templates/layout.html")
 	if err != nil {
 		log.Fatal(err)
@@ -58,10 +61,12 @@ func noteHandler(w http.ResponseWriter, r *http.Request, cfg *config) {
 	page := r.URL.Path
 	p := path.Join(cfg.DataPath, page)
 	var postMd string
-	if page != "/" {
-		postMd = p + ".md"
-	} else {
+	if page == "/" {
 		postMd = p + "/" + cfg.IndexFileName
+	} else if strings.HasSuffix(p, ".md") {
+		postMd = p
+	} else {
+		errorHandler(w, r, 404)
 	}
 	post, status, err := notes.getNote(postMd)
 	if err != nil {
